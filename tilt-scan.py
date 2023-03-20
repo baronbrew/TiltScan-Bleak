@@ -1,6 +1,20 @@
 import asyncio
+import os
 from bleak import BleakScanner
 from beacontools import parse_packet
+from aiohttp import web
+
+async def handler(request):
+  dir_list = os.listdir()
+  filter_object = filter(lambda a: 'TILT-' in a, dir_list)
+  tilt_list = list(filter_object)
+  lines = ''
+  if (tilt_list):
+    for i in tilt_list:
+      with open(i) as f:
+        lines += str(f.readlines())
+  else: print("No Tilt data files found.")
+  return web.Response(text=str(lines))
 
 tiltcolordict = {
 "a495bb10-c5b1-4b44-b512-1370f02d74de" : "RED",
@@ -24,7 +38,7 @@ def detection_callback(device, advertisement_data):
       # only process packets that succesfully parse as iBeacons
       if adv:
        print ("Mac: %s" % device.address)
-       print ("RSSI: %d" % device.rssi)
+       print ("RSSI: %d" % advertisement_data.rssi)
        print("UUID: %s" % adv.uuid)
        print("Major: %d" % adv.major)
        print("Minor: %d" % adv.minor)
@@ -44,17 +58,31 @@ def detection_callback(device, advertisement_data):
        #Process tx_power byte
        if adv.tx_power == -59:
         print ("Battery Age in Weeks: Updating...")
+        #stop_event.set()
        elif adv.tx_power == -103:
         print ("Battery Age in Weeks: Waking up...")
        elif adv.tx_power < 0:
          print ("Battery Age in Weeks: %d" % (int(adv.tx_power) + 2 ** 8))
        else:
          print ("Battery Age in Weeks: %d" % (int(adv.tx_power)))
+       with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.json','w') as f:
+        f.write(device.address)
 
-async def main():
-    scanner = BleakScanner(filters={"scanning_mode":"passive"})
-    scanner.register_detection_callback(detection_callback)
-    await scanner.start()
-    await asyncio.sleep(10.0)
-    await scanner.stop()
-asyncio.run(main())
+stop_server = asyncio.Event()
+
+async def startWebServer():
+  server = web.Server(handler)
+  runner = web.ServerRunner(server)
+  await runner.setup()
+  site = web.TCPSite(runner, 'localhost', 8080)
+  await site.start()
+  print("======= Serving on http://127.0.0.1:8080/ ======")
+  await stop_server.wait()
+
+async def startTiltScanner():
+  scanner = BleakScanner(filters={"scanning_mode":"passive"})
+  async with BleakScanner(detection_callback) as scanner:
+    await startWebServer()
+    await stop_server.wait()
+
+asyncio.run(startTiltScanner())     
