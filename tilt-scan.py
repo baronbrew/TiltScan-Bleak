@@ -2,7 +2,6 @@ import asyncio
 import os
 import datetime
 import time
-import json
 from bleak import BleakScanner
 from beacontools import parse_packet
 from aiohttp import web
@@ -22,7 +21,6 @@ async def handler(request):
       with open(i) as f:
         lines += str(f.readlines())
   else: print("No Tilt data files found.")
-  tiltdatalist.append(tiltdatadict)
   return web.json_response(tiltdatalist)
 
 tiltcolordict = {
@@ -46,44 +44,49 @@ def detection_callback(device, advertisement_data):
       adv = parse_packet(beaconbytes)
       # only process packets that succesfully parse as iBeacons
       if adv:
+       """
        print ("Mac: %s" % device.address)
-       deviceAddress = device.address
        print ("RSSI: %d" % advertisement_data.rssi)
        print("UUID: %s" % adv.uuid)
        print("Major: %d" % adv.major)
        print("Minor: %d" % adv.minor)
        print("TX Power: %d" % adv.tx_power)
+       """
        #Tilt specific processing
-       print("Color: %s" % tiltcolordict.get(adv.uuid))
+       #print("Color: %s" % tiltcolordict.get(adv.uuid))
        majorfloat = float(adv.major)
        minorfloat = float(adv.minor)
        if adv.minor < 5000:
+        """
         print("Precision: standard")
         print("TempF: %d" % majorfloat)
         print("SG: %.3f" % (minorfloat / 1000))
+        """
         uncalTemp = majorfloat
         uncalSG = minorfloat / 1000
        else:
+        """
         print("Precision: high")
         print("TempF: %.1f" % (majorfloat / 10))
         print("SG: %.4f" % (minorfloat / 10000))
+        """
         uncalTemp = majorfloat / 10
         uncalSG = minorfloat / 10000
-       #Process tx_power byte
+       # Process tx_power byte
        if adv.tx_power == -59:
-        print ("Battery Age in Weeks: Updating...")
+        #print ("Battery Age in Weeks: Updating...")
         battAgeWeeks = 'pending'
         opStatus = 0
        elif adv.tx_power == -103:
-        print ("Battery Age in Weeks: Waking up...")
+        #print ("Battery Age in Weeks: Waking up...")
         battAgeWeeks = 'pending'
         opStatus = 'wake up'
        elif adv.tx_power < 0:
-         print ("Battery Age in Weeks: %d" % (int(adv.tx_power) + 2 ** 8))
+         #print ("Battery Age in Weeks: %d" % (int(adv.tx_power) + 2 ** 8))
          battAgeWeeks = int(adv.tx_power) + 2 ** 8
          opStatus = 1
        else:
-         print ("Battery Age in Weeks: %d" % (int(adv.tx_power)))
+         #print ("Battery Age in Weeks: %d" % (int(adv.tx_power)))
          battAgeWeeks = int(adv.tx_power)
          opStatus = 1
        # log scanned tilt info to file
@@ -105,8 +108,17 @@ def detection_callback(device, advertisement_data):
         "uncalSG" : uncalSG,
         "uncalTemp" : uncalTemp,
         "battAgeWeeks" : battAgeWeeks,
-        "opStatus" : opStatus
+        "opStatus" : opStatus,
         }
+       if tiltdatalist == []:
+        tiltdatalist.append(tiltdatadict)
+       for i in tiltdatalist:
+        if i['mac'] == tiltdatadict['mac']:
+          tiltdatalist[tiltdatalist.index(i)] = tiltdatadict
+        elif tiltdatalist.index(i) == len(tiltdatalist) - 1:
+          tiltdatalist.append(tiltdatadict)
+       print(tiltdatalist)
+       
 
 event_control = asyncio.Event()
 
