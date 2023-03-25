@@ -92,9 +92,12 @@ def detection_callback(device, advertisement_data):
           opStatus = 1
         formatteddate = datetime.datetime.now().strftime('%x %X')
         Timepoint = (time.time() / 60 / 60 / 24 + 25569) - time.timezone / 60 / 60 / 24
-        
-        # save scanned tilt info to list of json objects
+        global tiltdatalist
         global tiltdatadict
+        try:
+         lastLoggedtoCSV = tiltdatadict['lastLoggedtoCSV']
+        except:
+          lastLoggedtoCSV = 0
         tiltdatadict = {
         "uuid" : adv.uuid.replace('-',''),
         "major" : adv.major,
@@ -110,19 +113,71 @@ def detection_callback(device, advertisement_data):
         "uncalTemp" : uncalTemp,
         "battAgeWeeks" : battAgeWeeks,
         "opStatus" : opStatus,
+        "lastLoggedtoCSV" : lastLoggedtoCSV
         }
-        global tiltdatalist
-        if len(tiltdatalist) == 0:
-          tiltdatalist.append(tiltdatadict)
+        if not tiltdatalist:
+          # log to csv and append to empty list
+          try:
+              with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','x') as f:
+                f.write(
+                    'Timestamp,Timepoint,SG,Temp,Color,Beer,Comment\n' 
+                  + formatteddate + ','
+                  + str(Timepoint) + ','
+                  + str(uncalSG) + ','
+                  + str(uncalTemp) + ','
+                  + tiltcolordict.get(adv.uuid) + ':' + device.address + ','
+                  + 'Untitled' + ','
+                  + '' + '\n'
+                  )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist.append(tiltdatadict)
+          except:
+              with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','a') as f:
+                f.write(
+                    formatteddate + ','
+                  + str(Timepoint) + ','
+                  + str(uncalSG) + ','
+                  + str(uncalTemp) + ','
+                  + tiltcolordict.get(adv.uuid) + ':' + device.address + ','
+                  + 'Untitled' + ','
+                  + '' + '\n'
+                  )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist.append(tiltdatadict)
         for i in tiltdatalist:
           if i['mac'] == tiltdatadict['mac']:
-            tiltdatalist[tiltdatalist.index(i)] = tiltdatadict
+            # log to csv every 15 minutes and update list regardless
+            if tiltdatadict['timeStamp'] - 900000 > i['lastLoggedtoCSV']:
+             try:
+              with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','x') as f:
+                f.write(
+                    'Timestamp,Timepoint,SG,Temp,Color,Beer,Comment\n' 
+                  + formatteddate + ','
+                  + str(Timepoint) + ','
+                  + str(uncalSG) + ','
+                  + str(uncalTemp) + ','
+                  + tiltcolordict.get(adv.uuid) + ':' + device.address + ','
+                  + 'Untitled' + ','
+                  + '' + '\n'
+                  )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist[tiltdatalist.index(i)] = tiltdatadict
+             except:
+              with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','a') as f:
+                f.write(
+                    formatteddate + ','
+                  + str(Timepoint) + ','
+                  + str(uncalSG) + ','
+                  + str(uncalTemp) + ','
+                  + tiltcolordict.get(adv.uuid) + ':' + device.address + ','
+                  + 'Untitled' + ','
+                  + '' + '\n'
+                  )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist[tiltdatalist.index(i)] = tiltdatadict
+            break
           elif tiltdatalist.index(i) == len(tiltdatalist) - 1:
-            tiltdatalist.append(tiltdatadict)
-        #print(len(tiltdatalist))
-        # log scanned tilt info to csv every 15 minutes
-        for i in tiltdatalist:
-          if i['timeStamp'] + 900000 < time.time() * 1000:
+            # log to csv on Tilt's first append
             try:
               with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','x') as f:
                 f.write(
@@ -135,6 +190,8 @@ def detection_callback(device, advertisement_data):
                   + 'Untitled' + ','
                   + '' + '\n'
                   )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist.append(tiltdatadict)
             except:
               with open(('TILT-' + (str(tiltcolordict.get(adv.uuid)) + '-' + device.address).replace(':','-')) + '.csv','a') as f:
                 f.write(
@@ -146,6 +203,9 @@ def detection_callback(device, advertisement_data):
                   + 'Untitled' + ','
                   + '' + '\n'
                   )
+              tiltdatadict['lastLoggedtoCSV'] = time.time() * 1000
+              tiltdatalist.append(tiltdatadict) 
+            break
 
 async def startWebServer():
   server1 = web.Server(handler1)
