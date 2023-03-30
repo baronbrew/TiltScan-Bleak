@@ -12,7 +12,7 @@ tiltdatadict = {}
 async def handler1(request):
   for i in tiltdatalist:
     # find and remove Tilts not seen in the last 2 minutes
-    if i['timeStamp'] + 120000 < time.time() * 1000:
+    if i['timeStamp'] + 300000 < time.time() * 1000:
       tiltdatalist.remove(i)
   return web.json_response(tiltdatalist)
 
@@ -42,8 +42,8 @@ def detection_callback(device, advertisement_data):
       adv = parse_packet(beaconbytes)
       # only process packets that succesfully parse as iBeacons
       if adv:
-       if tiltcolordict.get(adv.uuid):
-        # only process packets that succesfully parse as Tilts
+      # only process packets that succesfully parse as Tilts (& exclude disconnected repeaters)
+       if tiltcolordict.get(adv.uuid) and float(adv.minor) != 0:
         #print (tiltcolordict.get(adv.uuid))
         """
         print ("Mac: %s" % device.address)
@@ -111,6 +111,7 @@ def detection_callback(device, advertisement_data):
         "Timepoint" : (time.time() / 60 / 60 / 24 + 25569) - time.timezone / 60 / 60 / 24,
         "uncalSG" : uncalSG,
         "uncalTemp" : uncalTemp,
+        "tempunits" : "°F",
         "battAgeWeeks" : battAgeWeeks,
         "opStatus" : opStatus,
         "lastLoggedtoCSV" : lastLoggedtoCSV
