@@ -11,8 +11,8 @@ tiltdatadict = {}
 
 async def handler1(request):
   for i in tiltdatalist:
-    # find and remove Tilts not seen in the last 2 minutes
-    if i['timeStamp'] + 300000 < time.time() * 1000:
+    # find and remove Tilts not seen in the last 15 minutes
+    if i['timeStamp'] + 900000 < time.time() * 1000:
       tiltdatalist.remove(i)
   return web.json_response(tiltdatalist)
 
